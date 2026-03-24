@@ -886,13 +886,6 @@
         });
       }
 
-      function statusHtml(statusInfo) {
-        const status = normalizeStatus(statusInfo?.status);
-        const label =
-          status === "active" ? "Active" : status === "soon" ? "EOL Soon" : status === "eol" ? "EOL" : "Unknown";
-        return `<span class="status ${status}">${label}</span>`;
-      }
-
       function createPillElement(text) {
         const span = document.createElement("span");
         span.className = "pill";
@@ -917,66 +910,89 @@
         return "Unknown";
       }
 
-      function categoryPill(category) {
-        const safe = escapeHtml(category || "uncategorized");
-        return `<span class="pill">${safe}</span>`;
+      function makeEl(tag, props = {}, text) {
+        const el = document.createElement(tag);
+        Object.entries(props).forEach(([k, v]) => {
+          if (k === "className") el.className = v;
+          else if (k === "type") el.type = v;
+          else if (k.startsWith("data-")) el.dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+          else el.setAttribute(k, v);
+        });
+        if (text !== undefined) el.textContent = text;
+        return el;
+      }
+
+      function makeInfoNode(cls, message) {
+        return makeEl("div", { className: cls }, message);
       }
 
       function renderFilters() {
-        const statusButtons = [
+        const statusDefs = [
           ["all", "All"],
           ["active", "Active"],
           ["soon", "EOL Soon"],
           ["eol", "EOL"],
         ];
 
-        filtersRoot.innerHTML = `
-          <h2>Filter</h2>
-          <div class="field">
-            <label for="search">Search product</label>
-            <input id="search" type="search" value="${escapeAttr(state.searchText)}" placeholder="e.g. Node.js, Ubuntu" />
-          </div>
-          <div class="field">
-            <label for="category">Category</label>
-            <select id="category">
-              <option value="all" ${state.selectedCategory === "all" ? "selected" : ""}>All categories</option>
-              ${state.categories
-                .map(
-                  (c) => `<option value="${escapeAttr(c)}" ${state.selectedCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`
-                )
-                .join("")}
-            </select>
-          </div>
-          <div class="field">
-            <label>Status</label>
-            <div class="status-row">
-              ${statusButtons
-                .map(
-                  ([value, label]) =>
-                    `<button type="button" class="${state.selectedStatus === value ? "active" : ""}" data-status="${value}">${label}</button>`
-                )
-                .join("")}
-            </div>
-          </div>
-          <div class="field">
-            <button type="button" class="toggle ${state.showPinnedOnly ? "on" : ""}" id="pinned-only">
-              ${state.showPinnedOnly ? "Pinned only: On" : "Pinned only: Off"}
-            </button>
-          </div>
-          <div class="count" id="count">Showing 0 products</div>
-        `;
+        filtersRoot.textContent = "";
 
-        const search = filtersRoot.querySelector("#search");
-        const category = filtersRoot.querySelector("#category");
-        const pinnedOnly = filtersRoot.querySelector("#pinned-only");
-        const statusControls = Array.from(filtersRoot.querySelectorAll("[data-status]"));
+        filtersRoot.appendChild(makeEl("h2", {}, "Filter"));
 
-        search.addEventListener("input", (event) => {
+        // Search field
+        const searchField = makeEl("div", { className: "field" });
+        const searchLabel = makeEl("label", { for: "search" }, "Search product");
+        const searchInput = makeEl("input", { id: "search", type: "search", placeholder: "e.g. Node.js, Ubuntu" });
+        searchInput.value = state.searchText;
+        searchField.appendChild(searchLabel);
+        searchField.appendChild(searchInput);
+        filtersRoot.appendChild(searchField);
+
+        // Category field
+        const catField = makeEl("div", { className: "field" });
+        const catLabel = makeEl("label", { for: "category" }, "Category");
+        const catSelect = makeEl("select", { id: "category" });
+        const allOpt = makeEl("option", { value: "all" }, "All categories");
+        if (state.selectedCategory === "all") allOpt.selected = true;
+        catSelect.appendChild(allOpt);
+        state.categories.forEach((c) => {
+          const opt = makeEl("option", { value: c }, c);
+          if (state.selectedCategory === c) opt.selected = true;
+          catSelect.appendChild(opt);
+        });
+        catField.appendChild(catLabel);
+        catField.appendChild(catSelect);
+        filtersRoot.appendChild(catField);
+
+        // Status buttons
+        const statusField = makeEl("div", { className: "field" });
+        statusField.appendChild(makeEl("label", {}, "Status"));
+        const statusRow = makeEl("div", { className: "status-row" });
+        statusDefs.forEach(([value, label]) => {
+          const btn = makeEl("button", { type: "button" }, label);
+          btn.dataset.status = value;
+          if (state.selectedStatus === value) btn.classList.add("active");
+          statusRow.appendChild(btn);
+        });
+        statusField.appendChild(statusRow);
+        filtersRoot.appendChild(statusField);
+
+        // Pinned-only toggle
+        const pinField = makeEl("div", { className: "field" });
+        const pinnedOnly = makeEl("button", { type: "button", id: "pinned-only" });
+        pinnedOnly.className = `toggle ${state.showPinnedOnly ? "on" : ""}`;
+        pinnedOnly.textContent = state.showPinnedOnly ? "Pinned only: On" : "Pinned only: Off";
+        pinField.appendChild(pinnedOnly);
+        filtersRoot.appendChild(pinField);
+
+        filtersRoot.appendChild(makeEl("div", { className: "count", id: "count" }, "Showing 0 products"));
+
+        // Events
+        searchInput.addEventListener("input", (event) => {
           state.searchText = event.target.value;
           if (state.currentView === "dashboard") renderDashboard();
         });
 
-        category.addEventListener("change", (event) => {
+        catSelect.addEventListener("change", (event) => {
           state.selectedCategory = event.target.value;
           if (state.currentView === "dashboard") renderDashboard();
         });
@@ -987,9 +1003,9 @@
           if (state.currentView === "dashboard") renderDashboard();
         });
 
-        statusControls.forEach((button) => {
-          button.addEventListener("click", () => {
-            state.selectedStatus = button.dataset.status;
+        Array.from(statusRow.querySelectorAll("[data-status]")).forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.selectedStatus = btn.dataset.status;
             renderFilters();
             if (state.currentView === "dashboard") renderDashboard();
           });
@@ -1004,9 +1020,10 @@
       }
 
       function showDashboardSkeleton() {
-        root.innerHTML = `<div class="grid">${Array.from({ length: 8 })
-          .map(() => '<div class="skeleton"></div>')
-          .join("")}</div>`;
+        root.textContent = "";
+        const grid = makeEl("div", { className: "grid" });
+        Array.from({ length: 8 }).forEach(() => grid.appendChild(makeEl("div", { className: "skeleton" })));
+        root.appendChild(grid);
       }
 
       function renderDashboard() {
@@ -1016,7 +1033,8 @@
         }
 
         if (state.productLoadError) {
-          root.innerHTML = `<div class="error">${escapeHtml(state.productLoadError)}</div>`;
+          root.textContent = "";
+          root.appendChild(makeInfoNode("error", state.productLoadError));
           updateCountDisplay(0, 0);
           return;
         }
@@ -1025,8 +1043,8 @@
         updateCountDisplay(filtered.length, state.products.length);
 
         if (filtered.length === 0) {
-          root.innerHTML =
-            '<div class="empty">No products match your filters. Try clearing a filter or broadening your search.</div>';
+          root.textContent = "";
+          root.appendChild(makeInfoNode("empty", "No products match your filters. Try clearing a filter or broadening your search."));
           return;
         }
 
@@ -1195,7 +1213,8 @@
       }
 
       async function renderDetailView(name) {
-        root.innerHTML = '<div class="loading">Loading product details...</div>';
+        root.textContent = "";
+        root.appendChild(makeInfoNode("loading", "Loading product details..."));
 
         try {
           const detail = await fetchProduct(name);
@@ -1204,39 +1223,37 @@
           const pinned = state.pinnedProducts.has(name);
           const detailHtmlLink = sanitizeExternalUrl(detail.links?.html || "");
 
-          root.innerHTML = `
-            <div class="detail-head">
-              <button class="ghost" type="button" id="back-to-dashboard">Back to Dashboard</button>
-              <h2 id="detail-title"></h2>
-              <div class="meta" id="detail-meta"></div>
-              <div class="tag-list" id="detail-tags"></div>
-              <div class="meta" id="detail-actions"></div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Version</th>
-                    <th>LTS</th>
-                    <th>Released</th>
-                    <th>Active Support Ends</th>
-                    <th>EOL Date</th>
-                    <th>Status</th>
-                    <th>Latest</th>
-                  </tr>
-                </thead>
-                <tbody id="detail-releases-body"></tbody>
-              </table>
-            </div>
-          `;
+          root.textContent = "";
 
-          const backBtn = root.querySelector("#back-to-dashboard");
-          const pinBtn = root.querySelector("#toggle-pin");
-          const title = root.querySelector("#detail-title");
-          const meta = root.querySelector("#detail-meta");
-          const tags = root.querySelector("#detail-tags");
-          const actions = root.querySelector("#detail-actions");
-          const tbody = root.querySelector("#detail-releases-body");
+          const detailHead = makeEl("div", { className: "detail-head" });
+          const backBtn = makeEl("button", { className: "ghost", type: "button" }, "Back to Dashboard");
+          const title = makeEl("h2", {});
+          const meta = makeEl("div", { className: "meta" });
+          const tags = makeEl("div", { className: "tag-list" });
+          const actions = makeEl("div", { className: "meta" });
+          detailHead.appendChild(backBtn);
+          detailHead.appendChild(title);
+          detailHead.appendChild(meta);
+          detailHead.appendChild(tags);
+          detailHead.appendChild(actions);
+
+          const tableWrap = makeEl("div", { className: "table-wrap" });
+          const table = makeEl("table", {});
+          const thead = makeEl("thead", {});
+          const headRow = makeEl("tr", {});
+          ["Version", "LTS", "Released", "Active Support Ends", "EOL Date", "Status", "Latest"].forEach((h) =>
+            headRow.appendChild(makeEl("th", {}, h))
+          );
+          thead.appendChild(headRow);
+          const tbody = makeEl("tbody", {});
+          table.appendChild(thead);
+          table.appendChild(tbody);
+          tableWrap.appendChild(table);
+
+          root.appendChild(detailHead);
+          root.appendChild(tableWrap);
+
+          const pinBtn = makeEl("button", { type: "button" });
 
           title.textContent = detail.label || detail.name || "Unknown product";
           meta.appendChild(createPillElement(detail.category || "uncategorized"));
@@ -1278,7 +1295,8 @@
             pinBtn.textContent = state.pinnedProducts.has(name) ? "Pinned" : "Pin";
           });
         } catch (error) {
-          root.innerHTML = `<div class="error">${escapeHtml(explainApiError(error))}</div>`;
+          root.textContent = "";
+          root.appendChild(makeInfoNode("error", explainApiError(error)));
         }
       }
 
@@ -1340,19 +1358,21 @@
         hideTimelineTooltip();
         const pinnedNames = Array.from(state.pinnedProducts);
         if (pinnedNames.length === 0) {
-          root.innerHTML = '<div class="empty">Pin products on the Dashboard to see the timeline.</div>';
+          root.textContent = "";
+          root.appendChild(makeInfoNode("empty", "Pin products on the Dashboard to see the timeline."));
           return;
         }
 
-        root.innerHTML = '<div class="loading">Building timeline...</div>';
+        root.textContent = "";
+        root.appendChild(makeInfoNode("loading", "Building timeline..."));
 
         try {
           const details = await Promise.all(pinnedNames.map((name) => fetchProduct(name).catch(() => null)));
           const valid = details.filter(Boolean);
 
           if (valid.length === 0) {
-            root.innerHTML =
-              '<div class="error">No pinned products could be loaded right now. Please retry shortly.</div>';
+            root.textContent = "";
+            root.appendChild(makeInfoNode("error", "No pinned products could be loaded right now. Please retry shortly."));
             return;
           }
 
@@ -1389,7 +1409,8 @@
           });
 
           if (rows.length === 0) {
-            root.innerHTML = '<div class="empty">No release timeline data available for pinned products.</div>';
+            root.textContent = "";
+            root.appendChild(makeInfoNode("empty", "No release timeline data available for pinned products."));
             return;
           }
 
@@ -1408,63 +1429,62 @@
             byProduct.get(key).push(row);
           });
 
-          root.innerHTML = `
-            <div class="timeline">
-              <div class="timeline-grid">
-                <div class="timeline-axis">
-                  <div class="row-label"><strong>Product / Release</strong></div>
-                  <div class="ticks" id="ticks"></div>
-                </div>
-                <div id="timeline-body"></div>
-              </div>
-            </div>
-          `;
+          root.textContent = "";
+          const timelineWrap = makeEl("div", { className: "timeline" });
+          const timelineGrid = makeEl("div", { className: "timeline-grid" });
+          const axis = makeEl("div", { className: "timeline-axis" });
+          const axisLabel = makeEl("div", { className: "row-label" });
+          axisLabel.appendChild(makeEl("strong", {}, "Product / Release"));
+          const ticksContainer = makeEl("div", { className: "ticks" });
+          axis.appendChild(axisLabel);
+          axis.appendChild(ticksContainer);
+          const body = makeEl("div", {});
+          timelineGrid.appendChild(axis);
+          timelineGrid.appendChild(body);
+          timelineWrap.appendChild(timelineGrid);
+          root.appendChild(timelineWrap);
 
-          renderTicks(root.querySelector("#ticks"), minDate, maxDate, totalRange);
+          renderTicks(ticksContainer, minDate, maxDate, totalRange);
 
-          const body = root.querySelector("#timeline-body");
-          body.innerHTML = Array.from(byProduct.entries())
-            .map(([key, productRows]) => {
-              productRows.sort((a, b) => b.start - a.start);
-              return productRows
-                .map((row, index) => {
-                  const left = ((row.start.getTime() - minDate.getTime()) / totalRange) * 100;
-                  const width = Math.max(2, ((row.end.getTime() - row.start.getTime()) / totalRange) * 100);
-                  const label = `${row.productLabel} ${row.releaseLabel}`;
+          Array.from(byProduct.entries()).forEach(([, productRows]) => {
+            productRows.sort((a, b) => b.start - a.start);
+            productRows.forEach((row, index) => {
+              const left = ((row.start.getTime() - minDate.getTime()) / totalRange) * 100;
+              const width = Math.max(2, ((row.end.getTime() - row.start.getTime()) / totalRange) * 100);
+              const label = `${row.productLabel} ${row.releaseLabel}`;
 
-                  return `
-                    <div class="timeline-row">
-                      <div class="row-label">${index === 0 ? `<strong>${escapeHtml(row.productLabel)}</strong>` : ""}<div>${escapeHtml(row.releaseLabel)}</div></div>
-                      <div class="bar-area">
-                        <div
-                          class="bar ${row.status}"
-                          style="left:${left}%;width:${width}%"
-                          data-open="${escapeAttr(row.productName)}"
-                          data-tooltip="timeline"
-                          data-product-label="${escapeAttr(row.productLabel)}"
-                          data-release-label="${escapeAttr(row.releaseLabel)}"
-                          data-status="${escapeAttr(row.status)}"
-                          data-release-date="${escapeAttr(row.releaseDate)}"
-                          data-eoas-date="${escapeAttr(row.eoasFrom)}"
-                          data-eol-date="${escapeAttr(row.eolFrom)}"
-                          data-eoes-date="${escapeAttr(row.eoesFrom)}"
-                          data-eoas-label="${escapeAttr(row.supportLabels.eoas)}"
-                          data-eol-label="${escapeAttr(row.supportLabels.eol)}"
-                          data-eoes-label="${escapeAttr(row.supportLabels.eoes)}"
-                          data-latest-name="${escapeAttr(row.latestName)}"
-                          data-latest-date="${escapeAttr(row.latestDate)}"
-                          aria-label="${escapeAttr(`${label}: ${formatDate(row.start)} - ${formatDate(row.end)}`)}"
-                          tabindex="0"
-                        >
-                          ${escapeHtml(row.releaseLabel)}
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                })
-                .join("");
-            })
-            .join("");
+              const timelineRow = makeEl("div", { className: "timeline-row" });
+              const rowLabel = makeEl("div", { className: "row-label" });
+              if (index === 0) rowLabel.appendChild(makeEl("strong", {}, row.productLabel));
+              rowLabel.appendChild(makeEl("div", {}, row.releaseLabel));
+
+              const barArea = makeEl("div", { className: "bar-area" });
+              const bar = makeEl("div", { className: `bar ${row.status}`, tabindex: "0" });
+              bar.style.left = `${left}%`;
+              bar.style.width = `${width}%`;
+              bar.dataset.open = row.productName;
+              bar.dataset.tooltip = "timeline";
+              bar.dataset.productLabel = row.productLabel;
+              bar.dataset.releaseLabel = row.releaseLabel;
+              bar.dataset.status = row.status;
+              bar.dataset.releaseDate = row.releaseDate;
+              bar.dataset.eoasDate = row.eoasFrom;
+              bar.dataset.eolDate = row.eolFrom;
+              bar.dataset.eoesDate = row.eoesFrom;
+              bar.dataset.eoasLabel = row.supportLabels.eoas;
+              bar.dataset.eolLabel = row.supportLabels.eol;
+              bar.dataset.eoesLabel = row.supportLabels.eoes;
+              bar.dataset.latestName = row.latestName;
+              bar.dataset.latestDate = row.latestDate;
+              bar.setAttribute("aria-label", `${label}: ${formatDate(row.start)} - ${formatDate(row.end)}`);
+              bar.textContent = row.releaseLabel;
+
+              barArea.appendChild(bar);
+              timelineRow.appendChild(rowLabel);
+              timelineRow.appendChild(barArea);
+              body.appendChild(timelineRow);
+            });
+          });
 
           const todayLine = document.createElement("div");
           todayLine.className = "today-line";
@@ -1479,7 +1499,8 @@
 
           attachTimelineTooltipEvents(body);
         } catch (error) {
-          root.innerHTML = `<div class="error">${escapeHtml(explainApiError(error))}</div>`;
+          root.textContent = "";
+          root.appendChild(makeInfoNode("error", explainApiError(error)));
         }
       }
 
@@ -1588,7 +1609,12 @@
           cursor.setMonth(cursor.getMonth() + stepMonths);
         }
 
-        container.innerHTML = ticks.map((t) => `<span class="tick" style="left:${t.pct}%">${escapeHtml(t.label)}</span>`).join("");
+        container.textContent = "";
+        ticks.forEach((t) => {
+          const tick = makeEl("span", { className: "tick" }, t.label);
+          tick.style.left = `${t.pct}%`;
+          container.appendChild(tick);
+        });
       }
 
       function escapeHtml(value) {
@@ -1598,10 +1624,6 @@
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#039;");
-      }
-
-      function escapeAttr(value) {
-        return escapeHtml(value);
       }
 
       function cssEscape(value) {
