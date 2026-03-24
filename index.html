@@ -893,6 +893,22 @@
         return `<span class="status ${status}">${label}</span>`;
       }
 
+      function createPillElement(text) {
+        const span = document.createElement("span");
+        span.className = "pill";
+        span.textContent = String(text || "");
+        return span;
+      }
+
+      function createStatusElement(statusInfo) {
+        const status = normalizeStatus(statusInfo?.status);
+        const label = statusLabel(status);
+        const span = document.createElement("span");
+        span.className = `status ${status}`;
+        span.textContent = label;
+        return span;
+      }
+
       function statusLabel(status) {
         const normalized = normalizeStatus(status);
         if (normalized === "active") return "Active";
@@ -1153,25 +1169,14 @@
           state.statusByProduct.set(name, productStatus);
           const pinned = state.pinnedProducts.has(name);
           const detailHtmlLink = sanitizeExternalUrl(detail.links?.html || "");
-          const detailLinkMarkup = detailHtmlLink
-            ? `<a href="${escapeAttr(detailHtmlLink)}" target="_blank" rel="noopener noreferrer">Open on endoflife.date</a>`
-            : '<span class="pill">External link unavailable</span>';
 
           root.innerHTML = `
             <div class="detail-head">
               <button class="ghost" type="button" id="back-to-dashboard">Back to Dashboard</button>
-              <h2>${escapeHtml(detail.label)}</h2>
-              <div class="meta">
-                ${categoryPill(detail.category)}
-                ${statusHtml(productStatus)}
-              </div>
-              <div class="tag-list">
-                ${(detail.tags || []).map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("")}
-              </div>
-              <div class="meta">
-                <button class="pin ${pinned ? "on" : ""}" type="button" id="toggle-pin">${pinned ? "Pinned" : "Pin"}</button>
-                ${detailLinkMarkup}
-              </div>
+              <h2 id="detail-title"></h2>
+              <div class="meta" id="detail-meta"></div>
+              <div class="tag-list" id="detail-tags"></div>
+              <div class="meta" id="detail-actions"></div>
             </div>
             <div class="table-wrap">
               <table>
@@ -1186,15 +1191,43 @@
                     <th>Latest</th>
                   </tr>
                 </thead>
-                <tbody>
-                  ${renderReleaseRows(detail.releases || [])}
-                </tbody>
+                <tbody id="detail-releases-body"></tbody>
               </table>
             </div>
           `;
 
           const backBtn = root.querySelector("#back-to-dashboard");
           const pinBtn = root.querySelector("#toggle-pin");
+          const title = root.querySelector("#detail-title");
+          const meta = root.querySelector("#detail-meta");
+          const tags = root.querySelector("#detail-tags");
+          const actions = root.querySelector("#detail-actions");
+          const tbody = root.querySelector("#detail-releases-body");
+
+          title.textContent = detail.label || detail.name || "Unknown product";
+          meta.appendChild(createPillElement(detail.category || "uncategorized"));
+          meta.appendChild(createStatusElement(productStatus));
+
+          (detail.tags || []).forEach((tag) => {
+            tags.appendChild(createPillElement(tag));
+          });
+
+          pinBtn.classList.toggle("on", pinned);
+          pinBtn.textContent = pinned ? "Pinned" : "Pin";
+          actions.appendChild(pinBtn);
+
+          if (detailHtmlLink) {
+            const external = document.createElement("a");
+            external.href = detailHtmlLink;
+            external.target = "_blank";
+            external.rel = "noopener noreferrer";
+            external.textContent = "Open on endoflife.date";
+            actions.appendChild(external);
+          } else {
+            actions.appendChild(createPillElement("External link unavailable"));
+          }
+
+          appendReleaseRows(tbody, detail.releases || []);
 
           backBtn.addEventListener("click", () => {
             location.hash = "#dashboard";
@@ -1215,7 +1248,8 @@
         }
       }
 
-      function renderReleaseRows(releases) {
+      function appendReleaseRows(tbody, releases) {
+        tbody.textContent = "";
         const sorted = [...releases].sort((a, b) => {
           const ad = toDateSafe(a.releaseDate);
           const bd = toDateSafe(b.releaseDate);
@@ -1224,29 +1258,48 @@
           return bt - at;
         });
 
-        return sorted
-          .map((release) => {
-            const status = classifyReleaseStatus(release);
-            const rowClass = status === "eol" ? "old" : status === "soon" ? "soon" : "";
-            const latest = release.latest || {};
-            const safeLatestUrl = sanitizeExternalUrl(latest.link || "");
-            const latestLink = safeLatestUrl
-              ? `<a href="${escapeAttr(safeLatestUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(latest.name || "View")}</a>`
-              : escapeHtml(latest.name || "-");
+        sorted.forEach((release) => {
+          const status = classifyReleaseStatus(release);
+          const rowClass = status === "eol" ? "old" : status === "soon" ? "soon" : "";
+          const latest = release.latest || {};
+          const safeLatestUrl = sanitizeExternalUrl(latest.link || "");
 
-            return `
-              <tr class="${rowClass}">
-                <td>${escapeHtml(release.label || release.name || "-")}</td>
-                <td>${release.isLts ? "Yes" : "No"}</td>
-                <td>${formatDate(release.releaseDate)}</td>
-                <td>${formatDate(release.eoasFrom)}</td>
-                <td>${formatDate(release.eolFrom)}</td>
-                <td>${statusHtml({ status })}</td>
-                <td>${latestLink}</td>
-              </tr>
-            `;
-          })
-          .join("");
+          const tr = document.createElement("tr");
+          if (rowClass) tr.className = rowClass;
+
+          const cells = [
+            release.label || release.name || "-",
+            release.isLts ? "Yes" : "No",
+            formatDate(release.releaseDate),
+            formatDate(release.eoasFrom),
+            formatDate(release.eolFrom),
+          ];
+
+          cells.forEach((value) => {
+            const td = document.createElement("td");
+            td.textContent = value;
+            tr.appendChild(td);
+          });
+
+          const statusTd = document.createElement("td");
+          statusTd.appendChild(createStatusElement({ status }));
+          tr.appendChild(statusTd);
+
+          const latestTd = document.createElement("td");
+          if (safeLatestUrl) {
+            const latestAnchor = document.createElement("a");
+            latestAnchor.href = safeLatestUrl;
+            latestAnchor.target = "_blank";
+            latestAnchor.rel = "noopener noreferrer";
+            latestAnchor.textContent = latest.name || "View";
+            latestTd.appendChild(latestAnchor);
+          } else {
+            latestTd.textContent = latest.name || "-";
+          }
+          tr.appendChild(latestTd);
+
+          tbody.appendChild(tr);
+        });
       }
 
       async function renderTimelineView() {
@@ -1415,18 +1468,42 @@
           ? `${bar.dataset.latestName}${bar.dataset.latestDate ? ` (${formatDate(bar.dataset.latestDate)})` : ""}`
           : "-";
 
-        timelineTooltip.innerHTML = `
-          <p class="tt-title">${escapeHtml(bar.dataset.productLabel || "Product")}</p>
-          <p class="tt-subtitle">${escapeHtml(bar.dataset.releaseLabel || "Release")}</p>
-          <div style="margin-bottom:0.45rem;">${statusHtml({ status: bar.dataset.status })}</div>
-          <dl class="tt-grid">
-            <dt>Release date</dt><dd>${escapeHtml(releaseDate)}</dd>
-            <dt>${escapeHtml(bar.dataset.eoasLabel || "Active support ends")}</dt><dd>${escapeHtml(eoasDate)}</dd>
-            <dt>${escapeHtml(bar.dataset.eolLabel || "End of life")}</dt><dd>${escapeHtml(eolDate)}</dd>
-            <dt>${escapeHtml(bar.dataset.eoesLabel || "Extended support ends")}</dt><dd>${escapeHtml(eoesDate)}</dd>
-            <dt>Latest</dt><dd>${escapeHtml(latest)}</dd>
-          </dl>
-        `;
+        timelineTooltip.textContent = "";
+
+        const title = document.createElement("p");
+        title.className = "tt-title";
+        title.textContent = bar.dataset.productLabel || "Product";
+
+        const subtitle = document.createElement("p");
+        subtitle.className = "tt-subtitle";
+        subtitle.textContent = bar.dataset.releaseLabel || "Release";
+
+        const statusWrap = document.createElement("div");
+        statusWrap.style.marginBottom = "0.45rem";
+        statusWrap.appendChild(createStatusElement({ status: bar.dataset.status }));
+
+        const dl = document.createElement("dl");
+        dl.className = "tt-grid";
+
+        const addDetail = (term, value) => {
+          const dt = document.createElement("dt");
+          dt.textContent = term;
+          const dd = document.createElement("dd");
+          dd.textContent = value;
+          dl.appendChild(dt);
+          dl.appendChild(dd);
+        };
+
+        addDetail("Release date", releaseDate);
+        addDetail(bar.dataset.eoasLabel || "Active support ends", eoasDate);
+        addDetail(bar.dataset.eolLabel || "End of life", eolDate);
+        addDetail(bar.dataset.eoesLabel || "Extended support ends", eoesDate);
+        addDetail("Latest", latest);
+
+        timelineTooltip.appendChild(title);
+        timelineTooltip.appendChild(subtitle);
+        timelineTooltip.appendChild(statusWrap);
+        timelineTooltip.appendChild(dl);
 
         const rect = bar.getBoundingClientRect();
         const gap = 10;
