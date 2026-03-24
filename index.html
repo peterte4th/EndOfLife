@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EOL Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --color-bg: #f3f5ea;
+        --color-bg-alt: #e6ecf6;
+        --color-surface: #fffdf8;
+        --color-surface-2: #f5f7fc;
+        --color-text: #172034;
+        --color-muted: #56617b;
+        --color-border: rgba(23, 32, 52, 0.14);
+        --color-accent: #1168e6;
+        --color-accent-2: #ff7f50;
+        --shadow: 0 14px 40px rgba(24, 38, 63, 0.15);
+        --status-active: #18a957;
+        --status-soon: #d78d1e;
+        --status-eol: #d23f3f;
+        --status-unknown: #77839c;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-bg: #0d141f;
+          --color-bg-alt: #1a1723;
+          --color-surface: #101a27;
+          --color-surface-2: #172437;
+          --color-text: #e7ecf8;
+          --color-muted: #a7b0c5;
+          --color-border: rgba(231, 236, 248, 0.13);
+          --color-accent: #4da0ff;
+          --color-accent-2: #ff9b74;
+          --shadow: 0 22px 40px rgba(0, 0, 0, 0.35);
+          --status-active: #4ed48a;
+          --status-soon: #f2ba62;
+          --status-eol: #ff7f7f;
+          --status-unknown: #9ea7bc;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        color: var(--color-text);
+        background:
+          radial-gradient(circle at 6% 4%, color-mix(in srgb, var(--color-accent-2) 22%, transparent), transparent 34%),
+          radial-gradient(circle at 95% 95%, color-mix(in srgb, var(--color-accent) 20%, transparent), transparent 28%),
+          linear-gradient(140deg, var(--color-bg), var(--color-bg-alt));
+        min-height: 100vh;
+      }
+
+      a {
+        color: var(--color-accent);
+      }
+
+      .app {
+        width: min(1200px, 100% - 2rem);
+        margin: 1.1rem auto 2rem;
+      }
+
+      .top {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: end;
+        margin-bottom: 1rem;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-family: "Fraunces", serif;
+        font-size: clamp(1.8rem, 3.6vw, 2.7rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .brand p {
+        margin: 0.35rem 0 0;
+        color: var(--color-muted);
+      }
+
+      .view-switch {
+        display: flex;
+        background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        padding: 0.25rem;
+        backdrop-filter: blur(8px);
+      }
+
+      .view-switch button {
+        border: 0;
+        background: transparent;
+        color: var(--color-text);
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .view-switch button.active {
+        background: var(--color-accent);
+        color: white;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1rem;
+      }
+
+      .panel {
+        background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+        border: 1px solid var(--color-border);
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(9px);
+      }
+
+      .filters {
+        padding: 1rem;
+        position: sticky;
+        top: 1rem;
+        align-self: start;
+      }
+
+      .filters h2 {
+        margin: 0;
+        font-family: "Fraunces", serif;
+      }
+
+      .field {
+        margin-top: 0.95rem;
+      }
+
+      .field label {
+        display: block;
+        font-size: 0.83rem;
+        color: var(--color-muted);
+        margin-bottom: 0.35rem;
+      }
+
+      .field input,
+      .field select {
+        width: 100%;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-2);
+        color: var(--color-text);
+        border-radius: 12px;
+        padding: 0.63rem 0.7rem;
+        font: inherit;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+      }
+
+      .status-row button,
+      .toggle,
+      .pin {
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-2);
+        color: var(--color-text);
+        border-radius: 12px;
+        padding: 0.55rem 0.65rem;
+        font: inherit;
+        font-size: 0.86rem;
+        cursor: pointer;
+      }
+
+      .status-row button.active,
+      .toggle.on,
+      .pin.on {
+        border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+        background: color-mix(in srgb, var(--color-accent) 22%, var(--color-surface-2));
+      }
+
+      .count {
+        margin-top: 0.85rem;
+        font-size: 0.85rem;
+        color: var(--color-muted);
+      }
+
+      .main {
+        min-height: 520px;
+        padding: 1rem;
+        animation: rise 280ms ease-out;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.85rem;
+      }
+
+      .card {
+        border: 1px solid var(--color-border);
+        border-radius: 16px;
+        background: var(--color-surface-2);
+        padding: 0.8rem;
+        display: grid;
+        gap: 0.68rem;
+      }
+
+      .card-head {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: start;
+        gap: 0.5rem;
+      }
+
+      .product-btn {
+        border: 0;
+        background: transparent;
+        color: var(--color-text);
+        font: inherit;
+        text-align: left;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      .product-btn strong {
+        display: block;
+        font-size: 1rem;
+      }
+
+      .product-btn small {
+        display: block;
+        color: var(--color-muted);
+      }
+
+      .pill,
+      .status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        font-size: 0.73rem;
+        padding: 0.23rem 0.55rem;
+        border: 1px solid var(--color-border);
+      }
+
+      .status.active {
+        color: var(--status-active);
+        border-color: color-mix(in srgb, var(--status-active) 35%, var(--color-border));
+      }
+
+      .status.soon {
+        color: var(--status-soon);
+        border-color: color-mix(in srgb, var(--status-soon) 35%, var(--color-border));
+      }
+
+      .status.eol {
+        color: var(--status-eol);
+        border-color: color-mix(in srgb, var(--status-eol) 35%, var(--color-border));
+      }
+
+      .status.unknown {
+        color: var(--status-unknown);
+      }
+
+      .meta {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+      }
+
+      .card-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .ghost {
+        border: 0;
+        background: transparent;
+        color: var(--color-accent);
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .detail-head {
+        display: grid;
+        gap: 0.6rem;
+        margin-bottom: 1rem;
+      }
+
+      .detail-head h2 {
+        margin: 0;
+        font-family: "Fraunces", serif;
+        font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 760px;
+        font-size: 0.9rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 0.62rem;
+        border-bottom: 1px solid var(--color-border);
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: color-mix(in srgb, var(--color-surface-2) 88%, transparent);
+      }
+
+      tr.old {
+        opacity: 0.64;
+      }
+
+      tr.soon {
+        background: color-mix(in srgb, var(--status-soon) 14%, transparent);
+      }
+
+      .timeline {
+        overflow: auto;
+      }
+
+      .timeline-grid {
+        min-width: 900px;
+      }
+
+      .timeline-axis {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .ticks {
+        position: relative;
+        height: 40px;
+        overflow: hidden;
+      }
+
+      .tick {
+        position: absolute;
+        top: 10px;
+        transform: translateX(-50%);
+        font-size: 0.74rem;
+        color: var(--color-muted);
+        white-space: nowrap;
+        padding: 0 0.2rem;
+        background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+      }
+
+      .today-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: color-mix(in srgb, var(--status-eol) 70%, var(--color-accent));
+        z-index: 3;
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        border-bottom: 1px solid var(--color-border);
+        min-height: 38px;
+      }
+
+      .row-label {
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        color: var(--color-text);
+      }
+
+      .bar-area {
+        position: relative;
+      }
+
+      .bar {
+        position: absolute;
+        top: 8px;
+        height: 22px;
+        border-radius: 999px;
+        border: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        padding: 0 0.5rem;
+        font-size: 0.74rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .bar.active {
+        background: color-mix(in srgb, var(--status-active) 24%, var(--color-surface-2));
+      }
+
+      .bar.soon {
+        background: color-mix(in srgb, var(--status-soon) 24%, var(--color-surface-2));
+      }
+
+      .bar.eol {
+        background: color-mix(in srgb, var(--status-eol) 18%, var(--color-surface-2));
+        opacity: 0.6;
+      }
+
+      .empty,
+      .error,
+      .loading {
+        padding: 1rem;
+        border: 1px dashed var(--color-border);
+        border-radius: 12px;
+        color: var(--color-muted);
+      }
+
+      .skeleton {
+        height: 150px;
+        border-radius: 16px;
+        border: 1px solid var(--color-border);
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--color-surface-2) 80%, transparent) 20%,
+          color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-2)) 50%,
+          color-mix(in srgb, var(--color-surface-2) 80%, transparent) 80%
+        );
+        background-size: 280% 100%;
+        animation: shimmer 1.3s linear infinite;
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 120% 0;
+        }
+        100% {
+          background-position: -120% 0;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .filters {
+          position: static;
+        }
+
+        .main {
+          min-height: 420px;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .app {
+          width: min(1200px, 100% - 1rem);
+          margin-top: 0.7rem;
+        }
+
+        .top {
+          grid-template-columns: 1fr;
+        }
+
+        .status-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <h1>EOL Explorer</h1>
+          <p>Track support windows for the products you care about.</p>
+        </div>
+        <nav class="view-switch" aria-label="Views">
+          <button type="button" data-view="dashboard">Dashboard</button>
+          <button type="button" data-view="timeline">Timeline</button>
+        </nav>
+      </header>
+
+      <div class="layout">
+        <aside class="panel filters" id="filters"></aside>
+        <main class="panel main" id="root"></main>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "https://endoflife.date/api/v1";
+      const PIN_KEY = "eolExplorer:pins:v1";
+      const LIST_KEY = "eolExplorer:products:v1";
+      const SOON_MONTHS = 12;
+
+      const state = {
+        currentView: "dashboard",
+        searchText: "",
+        selectedCategory: "all",
+        selectedStatus: "all",
+        showPinnedOnly: false,
+        pinnedProducts: loadPins(),
+        detailCache: new Map(),
+        statusByProduct: new Map(),
+        products: [],
+        categories: [],
+        loadingProducts: true,
+        productLoadError: "",
+        observer: null,
+      };
+
+      const root = document.getElementById("root");
+      const filtersRoot = document.getElementById("filters");
+      const switchButtons = Array.from(document.querySelectorAll(".view-switch button"));
+
+      switchButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.view === "dashboard") {
+            location.hash = "#dashboard";
+          } else {
+            location.hash = "#timeline";
+          }
+        });
+      });
+
+      window.addEventListener("hashchange", route);
+
+      init();
+
+      async function init() {
+        renderFilters();
+        showDashboardSkeleton();
+        await fetchProductList();
+        route();
+        primePinnedStatuses();
+      }
+
+      function route() {
+        const hash = window.location.hash || "#dashboard";
+        if (hash.startsWith("#product/")) {
+          state.currentView = "detail";
+          const name = decodeURIComponent(hash.replace("#product/", ""));
+          setNav(null);
+          renderDetailView(name);
+          return;
+        }
+
+        if (hash === "#timeline") {
+          state.currentView = "timeline";
+          setNav("timeline");
+          renderTimelineView();
+          return;
+        }
+
+        state.currentView = "dashboard";
+        setNav("dashboard");
+        renderDashboard();
+      }
+
+      function setNav(view) {
+        switchButtons.forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.view === view);
+        });
+      }
+
+      function loadPins() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(PIN_KEY) || "[]");
+          return new Set(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          return new Set();
+        }
+      }
+
+      function savePins() {
+        localStorage.setItem(PIN_KEY, JSON.stringify(Array.from(state.pinnedProducts)));
+      }
+
+      function getDetailCacheKey(name) {
+        return `eolExplorer:detail:v1:${name}`;
+      }
+
+      function loadDetailFromStorage(name) {
+        try {
+          const item = localStorage.getItem(getDetailCacheKey(name));
+          if (!item) return null;
+          return JSON.parse(item);
+        } catch {
+          return null;
+        }
+      }
+
+      function saveDetailToStorage(name, data) {
+        try {
+          localStorage.setItem(getDetailCacheKey(name), JSON.stringify(data));
+        } catch {
+          // Storage quota issues should not block app usage.
+        }
+      }
+
+      function toDateSafe(value) {
+        if (!value) return null;
+        const dt = new Date(value);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      }
+
+      function addMonths(baseDate, months) {
+        const copy = new Date(baseDate);
+        copy.setMonth(copy.getMonth() + months);
+        return copy;
+      }
+
+      function formatDate(dateOrString) {
+        const dt = typeof dateOrString === "string" ? toDateSafe(dateOrString) : dateOrString;
+        if (!dt) return "-";
+        return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      }
+
+      function normalizeStatus(status) {
+        if (status === "active" || status === "soon" || status === "eol") {
+          return status;
+        }
+        return "unknown";
+      }
+
+      function classifyReleaseStatus(release, now = new Date()) {
+        const eolDate = toDateSafe(release.eolFrom);
+        if (release.isEol === true) return "eol";
+        if (!eolDate) return "active";
+        if (eolDate < now) return "eol";
+        if (eolDate <= addMonths(now, SOON_MONTHS)) return "soon";
+        return "active";
+      }
+
+      function computeProductStatus(productDetail) {
+        const releases = Array.isArray(productDetail.releases) ? productDetail.releases : [];
+        if (releases.length === 0) {
+          return { status: "unknown", eolDate: null, label: "Unknown" };
+        }
+
+        const candidates = releases
+          .map((release) => {
+            const status = classifyReleaseStatus(release);
+            const eolDate = toDateSafe(release.eolFrom);
+            return { release, status, eolDate };
+          })
+          .sort((a, b) => {
+            const ad = a.eolDate ? a.eolDate.getTime() : Number.POSITIVE_INFINITY;
+            const bd = b.eolDate ? b.eolDate.getTime() : Number.POSITIVE_INFINITY;
+            return ad - bd;
+          });
+
+        const activeOrSoon = candidates.find((c) => c.status === "active" || c.status === "soon");
+        if (activeOrSoon) {
+          const label = activeOrSoon.status === "soon" ? "EOL Soon" : "Active";
+          return { status: activeOrSoon.status, eolDate: activeOrSoon.eolDate, label };
+        }
+
+        const eol = candidates.find((c) => c.status === "eol");
+        if (eol) {
+          return { status: "eol", eolDate: eol.eolDate, label: "EOL" };
+        }
+
+        return { status: "unknown", eolDate: null, label: "Unknown" };
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!response.ok) {
+          const err = new Error(`Request failed with status ${response.status}`);
+          err.status = response.status;
+          throw err;
+        }
+        return response.json();
+      }
+
+      async function fetchProductList() {
+        state.loadingProducts = true;
+        state.productLoadError = "";
+
+        const cached = sessionStorage.getItem(LIST_KEY);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const result = parsed.result || [];
+            applyProductList(result);
+            state.loadingProducts = false;
+            return;
+          } catch {
+            sessionStorage.removeItem(LIST_KEY);
+          }
+        }
+
+        try {
+          const payload = await fetchJson(`${API_BASE}/products`);
+          const result = payload.result || [];
+          sessionStorage.setItem(LIST_KEY, JSON.stringify(payload));
+          applyProductList(result);
+        } catch (error) {
+          state.productLoadError = explainApiError(error);
+        } finally {
+          state.loadingProducts = false;
+        }
+      }
+
+      function applyProductList(result) {
+        state.products = result;
+        state.categories = [...new Set(result.map((p) => p.category).filter(Boolean))].sort();
+        renderFilters();
+      }
+
+      function explainApiError(error) {
+        if (error && error.status === 429) {
+          return "The API rate limit was reached. Please wait a bit and retry.";
+        }
+        if (error && error.status === 404) {
+          return "A requested resource was not found.";
+        }
+        return "Unable to reach endoflife.date right now. Please retry in a moment.";
+      }
+
+      async function fetchProduct(name) {
+        if (state.detailCache.has(name)) {
+          return state.detailCache.get(name);
+        }
+
+        const cached = loadDetailFromStorage(name);
+        if (cached && cached.result) {
+          state.detailCache.set(name, cached.result);
+          return cached.result;
+        }
+
+        const payload = await fetchJson(`${API_BASE}/products/${encodeURIComponent(name)}`);
+        const data = payload.result;
+        state.detailCache.set(name, data);
+        saveDetailToStorage(name, payload);
+        return data;
+      }
+
+      function getFilteredProducts() {
+        const text = state.searchText.trim().toLowerCase();
+
+        return state.products.filter((product) => {
+          const inSearch =
+            text.length === 0 ||
+            product.label.toLowerCase().includes(text) ||
+            product.name.toLowerCase().includes(text) ||
+            (product.aliases || []).some((alias) => alias.toLowerCase().includes(text));
+
+          if (!inSearch) return false;
+          if (state.selectedCategory !== "all" && product.category !== state.selectedCategory) return false;
+          if (state.showPinnedOnly && !state.pinnedProducts.has(product.name)) return false;
+
+          if (state.selectedStatus !== "all") {
+            const resolved = state.statusByProduct.get(product.name);
+            if (!resolved) return false;
+            return normalizeStatus(resolved.status) === state.selectedStatus;
+          }
+
+          return true;
+        });
+      }
+
+      function statusHtml(statusInfo) {
+        const status = normalizeStatus(statusInfo?.status);
+        const label =
+          status === "active" ? "Active" : status === "soon" ? "EOL Soon" : status === "eol" ? "EOL" : "Unknown";
+        return `<span class="status ${status}">${label}</span>`;
+      }
+
+      function categoryPill(category) {
+        const safe = escapeHtml(category || "uncategorized");
+        return `<span class="pill">${safe}</span>`;
+      }
+
+      function renderFilters() {
+        const statusButtons = [
+          ["all", "All"],
+          ["active", "Active"],
+          ["soon", "EOL Soon"],
+          ["eol", "EOL"],
+        ];
+
+        filtersRoot.innerHTML = `
+          <h2>Filter</h2>
+          <div class="field">
+            <label for="search">Search product</label>
+            <input id="search" type="search" value="${escapeAttr(state.searchText)}" placeholder="e.g. Node.js, Ubuntu" />
+          </div>
+          <div class="field">
+            <label for="category">Category</label>
+            <select id="category">
+              <option value="all" ${state.selectedCategory === "all" ? "selected" : ""}>All categories</option>
+              ${state.categories
+                .map(
+                  (c) => `<option value="${escapeAttr(c)}" ${state.selectedCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <div class="status-row">
+              ${statusButtons
+                .map(
+                  ([value, label]) =>
+                    `<button type="button" class="${state.selectedStatus === value ? "active" : ""}" data-status="${value}">${label}</button>`
+                )
+                .join("")}
+            </div>
+          </div>
+          <div class="field">
+            <button type="button" class="toggle ${state.showPinnedOnly ? "on" : ""}" id="pinned-only">
+              ${state.showPinnedOnly ? "Pinned only: On" : "Pinned only: Off"}
+            </button>
+          </div>
+          <div class="count" id="count">Showing 0 products</div>
+        `;
+
+        const search = filtersRoot.querySelector("#search");
+        const category = filtersRoot.querySelector("#category");
+        const pinnedOnly = filtersRoot.querySelector("#pinned-only");
+        const statusControls = Array.from(filtersRoot.querySelectorAll("[data-status]"));
+
+        search.addEventListener("input", (event) => {
+          state.searchText = event.target.value;
+          if (state.currentView === "dashboard") renderDashboard();
+        });
+
+        category.addEventListener("change", (event) => {
+          state.selectedCategory = event.target.value;
+          if (state.currentView === "dashboard") renderDashboard();
+        });
+
+        pinnedOnly.addEventListener("click", () => {
+          state.showPinnedOnly = !state.showPinnedOnly;
+          renderFilters();
+          if (state.currentView === "dashboard") renderDashboard();
+        });
+
+        statusControls.forEach((button) => {
+          button.addEventListener("click", () => {
+            state.selectedStatus = button.dataset.status;
+            renderFilters();
+            if (state.currentView === "dashboard") renderDashboard();
+          });
+        });
+      }
+
+      function updateCountDisplay(current, total = state.products.length) {
+        const count = filtersRoot.querySelector("#count");
+        if (count) {
+          count.textContent = `Showing ${current} of ${total} products`;
+        }
+      }
+
+      function showDashboardSkeleton() {
+        root.innerHTML = `<div class="grid">${Array.from({ length: 8 })
+          .map(() => '<div class="skeleton"></div>')
+          .join("")}</div>`;
+      }
+
+      function renderDashboard() {
+        if (state.loadingProducts) {
+          showDashboardSkeleton();
+          return;
+        }
+
+        if (state.productLoadError) {
+          root.innerHTML = `<div class="error">${escapeHtml(state.productLoadError)}</div>`;
+          updateCountDisplay(0, 0);
+          return;
+        }
+
+        const filtered = getFilteredProducts();
+        updateCountDisplay(filtered.length, state.products.length);
+
+        if (filtered.length === 0) {
+          root.innerHTML =
+            '<div class="empty">No products match your filters. Try clearing a filter or broadening your search.</div>';
+          return;
+        }
+
+        root.innerHTML = `
+          <div class="grid">
+            ${filtered.map((product) => renderCardHtml(product)).join("")}
+          </div>
+        `;
+
+        attachCardEvents(filtered);
+        setupIntersectionObserver(filtered);
+      }
+
+      function renderCardHtml(product) {
+        const statusInfo = state.statusByProduct.get(product.name);
+        const pinned = state.pinnedProducts.has(product.name);
+
+        return `
+          <article class="card" data-product="${escapeAttr(product.name)}">
+            <div class="card-head">
+              <button class="product-btn" type="button" data-open="${escapeAttr(product.name)}">
+                <strong>${escapeHtml(product.label)}</strong>
+                <small>${escapeHtml(product.name)}</small>
+              </button>
+              <button class="pin ${pinned ? "on" : ""}" type="button" data-pin="${escapeAttr(product.name)}">
+                ${pinned ? "Pinned" : "Pin"}
+              </button>
+            </div>
+            <div class="meta">
+              ${categoryPill(product.category)}
+              ${statusHtml(statusInfo)}
+            </div>
+            <div class="card-actions">
+              <small>${(product.tags || []).slice(0, 3).map(escapeHtml).join(" | ")}</small>
+              <button class="ghost" type="button" data-open="${escapeAttr(product.name)}">Details</button>
+            </div>
+          </article>
+        `;
+      }
+
+      function attachCardEvents(products) {
+        const openButtons = root.querySelectorAll("[data-open]");
+        openButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            location.hash = `#product/${encodeURIComponent(button.dataset.open)}`;
+          });
+        });
+
+        const pinButtons = root.querySelectorAll("[data-pin]");
+        pinButtons.forEach((button) => {
+          button.addEventListener("click", async () => {
+            const name = button.dataset.pin;
+            if (state.pinnedProducts.has(name)) {
+              state.pinnedProducts.delete(name);
+            } else {
+              state.pinnedProducts.add(name);
+              resolveProductStatus(name);
+            }
+            savePins();
+            if (state.currentView === "dashboard") renderDashboard();
+            if (state.currentView === "timeline") renderTimelineView();
+          });
+        });
+      }
+
+      function setupIntersectionObserver(products) {
+        if (state.observer) {
+          state.observer.disconnect();
+        }
+
+        state.observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const name = entry.target.dataset.product;
+              if (name && !state.statusByProduct.has(name)) {
+                resolveProductStatus(name);
+              }
+              state.observer.unobserve(entry.target);
+            });
+          },
+          { rootMargin: "120px" }
+        );
+
+        products.forEach((product) => {
+          if (state.statusByProduct.has(product.name)) return;
+          const el = root.querySelector(`[data-product="${cssEscape(product.name)}"]`);
+          if (el) {
+            state.observer.observe(el);
+          }
+        });
+      }
+
+      function updateCardStatus(name) {
+        if (state.currentView !== "dashboard") return;
+        const card = root.querySelector(`[data-product="${cssEscape(name)}"]`);
+        const statusInfo = state.statusByProduct.get(name);
+        if (!card || !statusInfo) return;
+        const statusEl = card.querySelector(".status");
+        if (statusEl) {
+          statusEl.outerHTML = statusHtml(statusInfo);
+        }
+
+        if (state.selectedStatus !== "all") {
+          renderDashboard();
+        }
+      }
+
+      async function resolveProductStatus(name) {
+        if (state.statusByProduct.has(name)) return state.statusByProduct.get(name);
+
+        try {
+          const detail = await fetchProduct(name);
+          const statusInfo = computeProductStatus(detail);
+          state.statusByProduct.set(name, statusInfo);
+          updateCardStatus(name);
+          return statusInfo;
+        } catch {
+          const fallback = { status: "unknown", eolDate: null, label: "Unknown" };
+          state.statusByProduct.set(name, fallback);
+          updateCardStatus(name);
+          return fallback;
+        }
+      }
+
+      async function primePinnedStatuses() {
+        const pins = Array.from(state.pinnedProducts);
+        await Promise.all(pins.map((name) => resolveProductStatus(name)));
+        if (state.currentView === "dashboard") {
+          renderDashboard();
+        }
+      }
+
+      async function renderDetailView(name) {
+        root.innerHTML = '<div class="loading">Loading product details...</div>';
+
+        try {
+          const detail = await fetchProduct(name);
+          const productStatus = computeProductStatus(detail);
+          state.statusByProduct.set(name, productStatus);
+          const pinned = state.pinnedProducts.has(name);
+
+          root.innerHTML = `
+            <div class="detail-head">
+              <button class="ghost" type="button" id="back-to-dashboard">Back to Dashboard</button>
+              <h2>${escapeHtml(detail.label)}</h2>
+              <div class="meta">
+                ${categoryPill(detail.category)}
+                ${statusHtml(productStatus)}
+              </div>
+              <div class="tag-list">
+                ${(detail.tags || []).map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("")}
+              </div>
+              <div class="meta">
+                <button class="pin ${pinned ? "on" : ""}" type="button" id="toggle-pin">${pinned ? "Pinned" : "Pin"}</button>
+                <a href="${escapeAttr(detail.links?.html || "")}" target="_blank" rel="noreferrer">Open on endoflife.date</a>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Version</th>
+                    <th>LTS</th>
+                    <th>Released</th>
+                    <th>Active Support Ends</th>
+                    <th>EOL Date</th>
+                    <th>Status</th>
+                    <th>Latest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${renderReleaseRows(detail.releases || [])}
+                </tbody>
+              </table>
+            </div>
+          `;
+
+          const backBtn = root.querySelector("#back-to-dashboard");
+          const pinBtn = root.querySelector("#toggle-pin");
+
+          backBtn.addEventListener("click", () => {
+            location.hash = "#dashboard";
+          });
+
+          pinBtn.addEventListener("click", () => {
+            if (state.pinnedProducts.has(name)) {
+              state.pinnedProducts.delete(name);
+            } else {
+              state.pinnedProducts.add(name);
+            }
+            savePins();
+            pinBtn.classList.toggle("on", state.pinnedProducts.has(name));
+            pinBtn.textContent = state.pinnedProducts.has(name) ? "Pinned" : "Pin";
+          });
+        } catch (error) {
+          root.innerHTML = `<div class="error">${escapeHtml(explainApiError(error))}</div>`;
+        }
+      }
+
+      function renderReleaseRows(releases) {
+        const sorted = [...releases].sort((a, b) => {
+          const ad = toDateSafe(a.releaseDate);
+          const bd = toDateSafe(b.releaseDate);
+          const at = ad ? ad.getTime() : 0;
+          const bt = bd ? bd.getTime() : 0;
+          return bt - at;
+        });
+
+        return sorted
+          .map((release) => {
+            const status = classifyReleaseStatus(release);
+            const rowClass = status === "eol" ? "old" : status === "soon" ? "soon" : "";
+            const latest = release.latest || {};
+            const latestLink = latest.link
+              ? `<a href="${escapeAttr(latest.link)}" target="_blank" rel="noreferrer">${escapeHtml(latest.name || "View")}</a>`
+              : escapeHtml(latest.name || "-");
+
+            return `
+              <tr class="${rowClass}">
+                <td>${escapeHtml(release.label || release.name || "-")}</td>
+                <td>${release.isLts ? "Yes" : "No"}</td>
+                <td>${formatDate(release.releaseDate)}</td>
+                <td>${formatDate(release.eoasFrom)}</td>
+                <td>${formatDate(release.eolFrom)}</td>
+                <td>${statusHtml({ status })}</td>
+                <td>${latestLink}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      async function renderTimelineView() {
+        const pinnedNames = Array.from(state.pinnedProducts);
+        if (pinnedNames.length === 0) {
+          root.innerHTML = '<div class="empty">Pin products on the Dashboard to see the timeline.</div>';
+          return;
+        }
+
+        root.innerHTML = '<div class="loading">Building timeline...</div>';
+
+        try {
+          const details = await Promise.all(pinnedNames.map((name) => fetchProduct(name).catch(() => null)));
+          const valid = details.filter(Boolean);
+
+          if (valid.length === 0) {
+            root.innerHTML =
+              '<div class="error">No pinned products could be loaded right now. Please retry shortly.</div>';
+            return;
+          }
+
+          const rows = [];
+          valid.forEach((detail) => {
+            (detail.releases || []).forEach((release) => {
+              const start = toDateSafe(release.releaseDate);
+              const end = toDateSafe(release.eolFrom) || addMonths(new Date(), 18);
+              const status = classifyReleaseStatus(release);
+              if (!start) return;
+              if (status === "eol") return;
+              rows.push({
+                productName: detail.name,
+                productLabel: detail.label,
+                releaseLabel: release.label || release.name || "(unknown)",
+                start,
+                end,
+                status,
+              });
+            });
+          });
+
+          if (rows.length === 0) {
+            root.innerHTML = '<div class="empty">No release timeline data available for pinned products.</div>';
+            return;
+          }
+
+          const minDate = new Date(Math.min(...rows.map((r) => r.start.getTime())));
+          const maxDate = new Date(Math.max(...rows.map((r) => r.end.getTime())));
+          minDate.setMonth(minDate.getMonth() - 1);
+          maxDate.setMonth(maxDate.getMonth() + 1);
+
+          const totalRange = maxDate.getTime() - minDate.getTime() || 1;
+          const todayPct = ((Date.now() - minDate.getTime()) / totalRange) * 100;
+
+          const byProduct = new Map();
+          rows.forEach((row) => {
+            const key = `${row.productName}|${row.productLabel}`;
+            if (!byProduct.has(key)) byProduct.set(key, []);
+            byProduct.get(key).push(row);
+          });
+
+          root.innerHTML = `
+            <div class="timeline">
+              <div class="timeline-grid">
+                <div class="timeline-axis">
+                  <div class="row-label"><strong>Product / Release</strong></div>
+                  <div class="ticks" id="ticks"></div>
+                </div>
+                <div id="timeline-body"></div>
+              </div>
+            </div>
+          `;
+
+          renderTicks(root.querySelector("#ticks"), minDate, maxDate, totalRange);
+
+          const body = root.querySelector("#timeline-body");
+          body.innerHTML = Array.from(byProduct.entries())
+            .map(([key, productRows]) => {
+              productRows.sort((a, b) => b.start - a.start);
+              return productRows
+                .map((row, index) => {
+                  const left = ((row.start.getTime() - minDate.getTime()) / totalRange) * 100;
+                  const width = Math.max(2, ((row.end.getTime() - row.start.getTime()) / totalRange) * 100);
+                  const label = `${row.productLabel} ${row.releaseLabel}`;
+
+                  return `
+                    <div class="timeline-row">
+                      <div class="row-label">${index === 0 ? `<strong>${escapeHtml(row.productLabel)}</strong>` : ""}<div>${escapeHtml(row.releaseLabel)}</div></div>
+                      <div class="bar-area">
+                        <div class="bar ${row.status}" style="left:${left}%;width:${width}%" data-open="${escapeAttr(row.productName)}" title="${escapeAttr(
+                          `${label}: ${formatDate(row.start)} - ${formatDate(row.end)}`
+                        )}">
+                          ${escapeHtml(row.releaseLabel)}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("");
+            })
+            .join("");
+
+          const todayLine = document.createElement("div");
+          todayLine.className = "today-line";
+          todayLine.style.left = `${Math.max(0, Math.min(100, todayPct))}%`;
+          body.appendChild(todayLine);
+
+          body.querySelectorAll("[data-open]").forEach((bar) => {
+            bar.addEventListener("click", () => {
+              location.hash = `#product/${encodeURIComponent(bar.dataset.open)}`;
+            });
+          });
+        } catch (error) {
+          root.innerHTML = `<div class="error">${escapeHtml(explainApiError(error))}</div>`;
+        }
+      }
+
+      function renderTicks(container, minDate, maxDate, totalRange) {
+        const ticks = [];
+        const startMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        const endMonth = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+        const monthCount =
+          (endMonth.getFullYear() - startMonth.getFullYear()) * 12 + (endMonth.getMonth() - startMonth.getMonth()) + 1;
+        const width = Math.max(container.clientWidth || 900, 320);
+        const maxLabels = Math.max(3, Math.floor(width / 95));
+        const stepMonths = Math.max(1, Math.ceil(monthCount / maxLabels));
+
+        const cursor = new Date(startMonth);
+        while (cursor <= endMonth) {
+          const pct = ((cursor.getTime() - minDate.getTime()) / totalRange) * 100;
+          if (pct >= 0 && pct <= 100) {
+            const label =
+              stepMonths >= 6
+                ? cursor.toLocaleDateString(undefined, { year: "numeric" })
+                : cursor.toLocaleDateString(undefined, { year: "2-digit", month: "short" });
+            ticks.push({ pct, label });
+          }
+          cursor.setMonth(cursor.getMonth() + stepMonths);
+        }
+
+        container.innerHTML = ticks.map((t) => `<span class="tick" style="left:${t.pct}%">${escapeHtml(t.label)}</span>`).join("");
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value);
+      }
+
+      function cssEscape(value) {
+        if (window.CSS && CSS.escape) {
+          return CSS.escape(value);
+        }
+        return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+      }
+    </script>
+  </body>
+</html>
