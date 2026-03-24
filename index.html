@@ -781,18 +781,22 @@
             return ad - bd;
           });
 
+        const ORDER = ["active", "soon", "eol"];
+        const presentSet = new Set(candidates.map((c) => c.status).filter((s) => ORDER.includes(s)));
+        const statuses = ORDER.filter((s) => presentSet.has(s));
+
         const activeOrSoon = candidates.find((c) => c.status === "active" || c.status === "soon");
         if (activeOrSoon) {
           const label = activeOrSoon.status === "soon" ? "EOL Soon" : "Active";
-          return { status: activeOrSoon.status, eolDate: activeOrSoon.eolDate, label };
+          return { status: activeOrSoon.status, eolDate: activeOrSoon.eolDate, label, statuses };
         }
 
         const eol = candidates.find((c) => c.status === "eol");
         if (eol) {
-          return { status: "eol", eolDate: eol.eolDate, label: "EOL" };
+          return { status: "eol", eolDate: eol.eolDate, label: "EOL", statuses };
         }
 
-        return { status: "unknown", eolDate: null, label: "Unknown" };
+        return { status: "unknown", eolDate: null, label: "Unknown", statuses: ["unknown"] };
       }
 
       async function fetchJson(url) {
@@ -898,7 +902,7 @@
           if (state.selectedStatus !== "all") {
             const resolved = state.statusByProduct.get(product.name);
             if (!resolved) return false;
-            return normalizeStatus(resolved.status) === state.selectedStatus;
+            return (resolved.statuses || [normalizeStatus(resolved.status)]).includes(state.selectedStatus);
           }
 
           return true;
@@ -1114,7 +1118,8 @@
         const meta = document.createElement("div");
         meta.className = "meta";
         meta.appendChild(createPillElement(product.category || "uncategorized"));
-        meta.appendChild(createStatusElement(statusInfo));
+        const statuses = statusInfo?.statuses || (statusInfo ? [normalizeStatus(statusInfo.status)] : []);
+        statuses.forEach((s) => meta.appendChild(createStatusElement({ status: s })));
 
         const actions = document.createElement("div");
         actions.className = "card-actions";
@@ -1196,10 +1201,10 @@
         const card = root.querySelector(`[data-product="${cssEscape(name)}"]`);
         const statusInfo = state.statusByProduct.get(name);
         if (!card || !statusInfo) return;
-        const statusEl = card.querySelector(".status");
-        if (statusEl) {
-          statusEl.replaceWith(createStatusElement(statusInfo));
-        }
+        card.querySelectorAll(".status").forEach((el) => el.remove());
+        const pill = card.querySelector(".pill");
+        const statuses = statusInfo.statuses || [normalizeStatus(statusInfo.status)];
+        statuses.forEach((s) => pill.after(createStatusElement({ status: s })));
 
         if (state.selectedStatus !== "all") {
           renderDashboard();
