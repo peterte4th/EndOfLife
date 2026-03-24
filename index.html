@@ -32,6 +32,9 @@
         --status-soon: #d78d1e;
         --status-eol: #d23f3f;
         --status-unknown: #77839c;
+        --phase-active: color-mix(in srgb, var(--status-active) 38%, var(--color-surface-2));
+        --phase-security: color-mix(in srgb, var(--status-soon) 48%, var(--color-surface-2));
+        --phase-extended: color-mix(in srgb, var(--status-eol) 32%, var(--color-surface-2));
       }
 
       @media (prefers-color-scheme: dark) {
@@ -728,6 +731,22 @@
         return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
       }
 
+      function buildBarGradient(row) {
+        const eoasDate = toDateSafe(row.eoasFrom);
+        if (!eoasDate) return null;
+        const barMs = row.end.getTime() - row.start.getTime();
+        if (barMs <= 0) return null;
+        const pct = (d) => Math.max(0, Math.min(100, (d.getTime() - row.start.getTime()) / barMs * 100)).toFixed(2);
+        const eoasPct = pct(eoasDate);
+        const eolDate = toDateSafe(row.eolFrom);
+        const eoesDate = toDateSafe(row.eoesFrom);
+        if (eolDate && eoesDate && eoesDate > eolDate) {
+          const eolPct = pct(eolDate);
+          return `linear-gradient(to right, var(--phase-active) ${eoasPct}%, var(--phase-security) ${eoasPct}% ${eolPct}%, var(--phase-extended) ${eolPct}% 100%)`;
+        }
+        return `linear-gradient(to right, var(--phase-active) ${eoasPct}%, var(--phase-security) ${eoasPct}% 100%)`;
+      }
+
       function normalizeStatus(status) {
         if (status === "active" || status === "soon" || status === "eol") {
           return status;
@@ -1386,7 +1405,9 @@
 
             (detail.releases || []).forEach((release) => {
               const start = toDateSafe(release.releaseDate);
-              const end = toDateSafe(release.eolFrom) || addMonths(new Date(), 18);
+              const eolDateEnd = toDateSafe(release.eolFrom) || addMonths(new Date(), 18);
+              const eoesDateEnd = toDateSafe(release.eoesFrom);
+              const end = eoesDateEnd && eoesDateEnd > eolDateEnd ? eoesDateEnd : eolDateEnd;
               const status = classifyReleaseStatus(release);
               if (!start) return;
               if (status === "eol") return;
@@ -1478,6 +1499,8 @@
               bar.dataset.latestDate = row.latestDate;
               bar.setAttribute("aria-label", `${label}: ${formatDate(row.start)} - ${formatDate(row.end)}`);
               bar.textContent = row.releaseLabel;
+              const gradient = buildBarGradient(row);
+              if (gradient) bar.style.background = gradient;
 
               barArea.appendChild(bar);
               timelineRow.appendChild(rowLabel);
