@@ -1030,41 +1030,75 @@
           return;
         }
 
-        root.innerHTML = `
-          <div class="grid">
-            ${filtered.map((product) => renderCardHtml(product)).join("")}
-          </div>
-        `;
+        root.textContent = "";
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        filtered.forEach((product) => {
+          grid.appendChild(createCardElement(product));
+        });
+        root.appendChild(grid);
 
         attachCardEvents(filtered);
         setupIntersectionObserver(filtered);
       }
 
-      function renderCardHtml(product) {
+      function createCardElement(product) {
         const statusInfo = state.statusByProduct.get(product.name);
         const pinned = state.pinnedProducts.has(product.name);
 
-        return `
-          <article class="card" data-product="${escapeAttr(product.name)}">
-            <div class="card-head">
-              <button class="product-btn" type="button" data-open="${escapeAttr(product.name)}">
-                <strong>${escapeHtml(product.label)}</strong>
-                <small>${escapeHtml(product.name)}</small>
-              </button>
-              <button class="pin ${pinned ? "on" : ""}" type="button" data-pin="${escapeAttr(product.name)}">
-                ${pinned ? "Pinned" : "Pin"}
-              </button>
-            </div>
-            <div class="meta">
-              ${categoryPill(product.category)}
-              ${statusHtml(statusInfo)}
-            </div>
-            <div class="card-actions">
-              <small>${(product.tags || []).slice(0, 3).map(escapeHtml).join(" | ")}</small>
-              <button class="ghost" type="button" data-open="${escapeAttr(product.name)}">Details</button>
-            </div>
-          </article>
-        `;
+        const card = document.createElement("article");
+        card.className = "card";
+        card.dataset.product = product.name;
+
+        const head = document.createElement("div");
+        head.className = "card-head";
+
+        const productBtn = document.createElement("button");
+        productBtn.className = "product-btn";
+        productBtn.type = "button";
+        productBtn.dataset.open = product.name;
+
+        const strong = document.createElement("strong");
+        strong.textContent = product.label || product.name || "Unknown";
+        const small = document.createElement("small");
+        small.textContent = product.name || "-";
+        productBtn.appendChild(strong);
+        productBtn.appendChild(small);
+
+        const pinBtn = document.createElement("button");
+        pinBtn.className = `pin ${pinned ? "on" : ""}`;
+        pinBtn.type = "button";
+        pinBtn.dataset.pin = product.name;
+        pinBtn.textContent = pinned ? "Pinned" : "Pin";
+
+        head.appendChild(productBtn);
+        head.appendChild(pinBtn);
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.appendChild(createPillElement(product.category || "uncategorized"));
+        meta.appendChild(createStatusElement(statusInfo));
+
+        const actions = document.createElement("div");
+        actions.className = "card-actions";
+
+        const tags = document.createElement("small");
+        tags.textContent = (product.tags || []).slice(0, 3).join(" | ");
+
+        const detailsBtn = document.createElement("button");
+        detailsBtn.className = "ghost";
+        detailsBtn.type = "button";
+        detailsBtn.dataset.open = product.name;
+        detailsBtn.textContent = "Details";
+
+        actions.appendChild(tags);
+        actions.appendChild(detailsBtn);
+
+        card.appendChild(head);
+        card.appendChild(meta);
+        card.appendChild(actions);
+
+        return card;
       }
 
       function attachCardEvents(products) {
@@ -1127,7 +1161,7 @@
         if (!card || !statusInfo) return;
         const statusEl = card.querySelector(".status");
         if (statusEl) {
-          statusEl.outerHTML = statusHtml(statusInfo);
+          statusEl.replaceWith(createStatusElement(statusInfo));
         }
 
         if (state.selectedStatus !== "all") {
