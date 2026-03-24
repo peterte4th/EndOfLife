@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://endoflife.date; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
     <title>EOL Explorer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -826,6 +831,19 @@
         return "Unable to reach endoflife.date right now. Please retry in a moment.";
       }
 
+      function sanitizeExternalUrl(value) {
+        if (!value) return "";
+        try {
+          const parsed = new URL(String(value), window.location.origin);
+          if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+            return parsed.href;
+          }
+          return "";
+        } catch {
+          return "";
+        }
+      }
+
       async function fetchProduct(name) {
         if (state.detailCache.has(name)) {
           return state.detailCache.get(name);
@@ -1134,6 +1152,10 @@
           const productStatus = computeProductStatus(detail);
           state.statusByProduct.set(name, productStatus);
           const pinned = state.pinnedProducts.has(name);
+          const detailHtmlLink = sanitizeExternalUrl(detail.links?.html || "");
+          const detailLinkMarkup = detailHtmlLink
+            ? `<a href="${escapeAttr(detailHtmlLink)}" target="_blank" rel="noopener noreferrer">Open on endoflife.date</a>`
+            : '<span class="pill">External link unavailable</span>';
 
           root.innerHTML = `
             <div class="detail-head">
@@ -1148,7 +1170,7 @@
               </div>
               <div class="meta">
                 <button class="pin ${pinned ? "on" : ""}" type="button" id="toggle-pin">${pinned ? "Pinned" : "Pin"}</button>
-                <a href="${escapeAttr(detail.links?.html || "")}" target="_blank" rel="noreferrer">Open on endoflife.date</a>
+                ${detailLinkMarkup}
               </div>
             </div>
             <div class="table-wrap">
@@ -1207,8 +1229,9 @@
             const status = classifyReleaseStatus(release);
             const rowClass = status === "eol" ? "old" : status === "soon" ? "soon" : "";
             const latest = release.latest || {};
-            const latestLink = latest.link
-              ? `<a href="${escapeAttr(latest.link)}" target="_blank" rel="noreferrer">${escapeHtml(latest.name || "View")}</a>`
+            const safeLatestUrl = sanitizeExternalUrl(latest.link || "");
+            const latestLink = safeLatestUrl
+              ? `<a href="${escapeAttr(safeLatestUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(latest.name || "View")}</a>`
               : escapeHtml(latest.name || "-");
 
             return `
