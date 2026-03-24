@@ -1018,12 +1018,14 @@
         catSelect.addEventListener("change", (event) => {
           state.selectedCategory = event.target.value;
           if (state.currentView === "dashboard") renderDashboard();
+          if (state.currentView === "timeline") renderTimelineView();
         });
 
         pinnedOnly.addEventListener("click", () => {
           state.showPinnedOnly = !state.showPinnedOnly;
           renderFilters();
           if (state.currentView === "dashboard") renderDashboard();
+          if (state.currentView === "timeline") renderTimelineView();
         });
 
         Array.from(statusRow.querySelectorAll("[data-status]")).forEach((btn) => {
@@ -1031,6 +1033,7 @@
             state.selectedStatus = btn.dataset.status;
             renderFilters();
             if (state.currentView === "dashboard") renderDashboard();
+            if (state.currentView === "timeline") renderTimelineView();
           });
         });
       }
@@ -1387,11 +1390,21 @@
           return;
         }
 
+        // Apply the same filters as the dashboard
+        const filteredNames = new Set(getFilteredProducts().map((p) => p.name));
+        const visibleNames = pinnedNames.filter((n) => filteredNames.has(n));
+
+        if (visibleNames.length === 0) {
+          root.textContent = "";
+          root.appendChild(makeInfoNode("empty", "No pinned products match the current filters."));
+          return;
+        }
+
         root.textContent = "";
         root.appendChild(makeInfoNode("loading", "Building timeline..."));
 
         try {
-          const details = await Promise.all(pinnedNames.map((name) => fetchProduct(name).catch(() => null)));
+          const details = await Promise.all(visibleNames.map((name) => fetchProduct(name).catch(() => null)));
           const valid = details.filter(Boolean);
 
           if (valid.length === 0) {
